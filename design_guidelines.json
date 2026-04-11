@@ -1,0 +1,133 @@
+{
+  "theme_and_archetype": {
+    "theme": "Light",
+    "archetype": "Archetype 4: Swiss & High-Contrast",
+    "rationale": "For an OCR translation tool handling physical supply chain bills, a light theme reflects the reality of paper documents. The Swiss & High-Contrast archetype emphasizes authority, data clarity, and objective truth, turning a mundane utility into a premium enterprise experience. It prioritizes function over decoration."
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Cabinet Grotesk",
+      "body": "IBM Plex Sans",
+      "mono": "JetBrains Mono"
+    },
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tighter",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight",
+      "h3": "text-xl sm:text-2xl tracking-tight",
+      "h4": "text-lg sm:text-xl",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm",
+      "overline": "text-xs uppercase tracking-[0.2em]"
+    },
+    "rules": [
+      "No generic sans-serifs (Inter, Roboto, Space Grotesk) for headings.",
+      "Use JetBrains Mono for data points like OCR confidence scores, file sizes, and transaction IDs.",
+      "Headlines must use tight letter spacing (tracking-tighter).",
+      "Overlines must be uppercase with wide tracking."
+    ]
+  },
+  "colors": {
+    "palette": {
+      "background_base": "#F7F7F7",
+      "background_surface": "#FFFFFF",
+      "text_primary": "#0A0A0A",
+      "text_secondary": "#525252",
+      "border_default": "#E5E5E5",
+      "border_strong": "#A3A3A3",
+      "accent_primary": "#002FA7",
+      "accent_primary_hover": "#001F70",
+      "accent_warning": "#FF3333",
+      "accent_success": "#00875A"
+    },
+    "rules": [
+      "Use #002FA7 (International Klein Blue) exclusively for primary CTAs (Upload, Translate, Download PDF).",
+      "Never use pure black or pure white without intention. The contrast between #FFFFFF (surface) and #F7F7F7 (background base) creates structural hierarchy.",
+      "Ensure text meets APCA standards. All text on accent_primary must be white."
+    ]
+  },
+  "spacing_and_layout": {
+    "system": "Tailwind Scale (p-1, p-2, p-4, p-6, p-8, p-12, p-16, p-20, p-24, p-32)",
+    "generous_spacing": "Containers with borders must have internal padding (p-6 or p-8) to prevent text collision.",
+    "dashboard_grid": {
+      "mode": "MODE B: THE CONTROL ROOM GRID",
+      "base_grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4",
+      "gap": "gap-4 or gap-6",
+      "rules": "Every pixel must be utilized. Use h-full on children to stretch to match neighbors."
+    }
+  },
+  "surface_strategies": {
+    "dashboard_cards": {
+      "style": "GRID BORDERS (The 'Technical' Look)",
+      "description": "Expose the skeleton. Container uses border-collapse layout style. Items have right and bottom subtle borders. Flat background, no shadows."
+    },
+    "upload_zone": {
+      "style": "THE 'TRACING BEAM' / Interactive Zone",
+      "description": "A dynamic dashed border or glowing animated edge to signify the dropzone is active and waiting for input. Use framer-motion for smooth state transitions."
+    },
+    "header": {
+      "style": "Solid Technical",
+      "description": "Solid white background with a hard bottom border (1px border-border). Not glassmorphism, keeping the data-centric clinical feel."
+    }
+  },
+  "components": {
+    "shadcn": [
+      "Table (for Translation History)",
+      "Button (for all CTAs, customize with sharp edges/zero radius)",
+      "Dialog (for document preview)",
+      "Tabs (for switching between Single and Batch upload modes)",
+      "Badge (for language source/target and OCR status)",
+      "Progress (for translation and PDF generation loading states)"
+    ],
+    "custom_instructions": {
+      "cards": "Go cardless where possible. Rely on strict grid boundaries and 1px borders instead of drop-shadow cards.",
+      "edges": "Sharp corners (rounded-none or max rounded-sm) to match the Swiss Brutalist aesthetic.",
+      "icons": "Use Phosphor Icons (yarn add @phosphor-icons/react). They feel more technical and constructed."
+    }
+  },
+  "motion_and_interactions": {
+    "hover_states": "Slight lift (-translate-y-1) is forbidden for this archetype. Instead, rely on background color shifts and border darkening.",
+    "upload_animation": "Micro-interaction: When a file is uploaded, show a simulated 'scanning' laser line (using framer-motion) moving down the document.",
+    "loading": "Use monospace terminal-like text updates (e.g., 'Extracting text...', 'Translating via LLM...', 'Generating PDF...') instead of a simple spinner."
+  },
+  "media_and_images": {
+    "saas_header_bg": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/7504f9e0-890e-457d-bcbf-ed056fcb5564/images/783f45b01ffcac3c64a8d85bcc33498fde7a1c4f2fc2d1c70813015aa2f56431.png",
+      "usage": "Use as a subtle hero or header background for the main dashboard welcome section. Set opacity low to keep text readable."
+    },
+    "ocr_scanner_illustration": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/7504f9e0-890e-457d-bcbf-ed056fcb5564/images/8365c21bdc5adc579a401d5ae4c1932033eefc4b32850804e1e5e50b6ecaab8c.png",
+      "usage": "Use as the primary visual for the empty state of the translation history or next to the main upload dropzone."
+    },
+    "logistics_warehouse_bg": {
+      "url": "https://images.unsplash.com/photo-1573209680076-bd7ec7007616?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MjJ8MHwxfHNlYXJjaHwxfHxsb2dpc3RpY3MlMjB3YXJlaG91c2UlMjBzdXBwbHklMjBjaGFpbnxlbnwwfHx8fDE3NzU5MTI5MjB8MA&ixlib=rb-4.1.0&q=85",
+      "usage": "Use in the login/auth split-screen on the image half."
+    },
+    "paper_receipts_pile": {
+      "url": "https://images.unsplash.com/photo-1673874855449-e8620ddfa867?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwxfHxwYXBlciUyMHJlY2VpcHRzJTIwYmlsbHMlMjBhY2NvdW50aW5nfGVufDB8fHx8MTc3NTkxMjkyMHww&ixlib=rb-4.1.0&q=85",
+      "usage": "Use as a textured background for a promotional 'How it Works' section or a banner inside the app."
+    }
+  },
+  "pages_and_layout": {
+    "dashboard": {
+      "description": "The main command center. Left sidebar for navigation (History, Upload, Settings). Main area uses Control Room Grid.",
+      "components": [
+        "Welcome Banner (using saas_header_bg)",
+        "Upload Widget (Spans 2 columns, uses tracing beam)",
+        "Quick Stats (Spans 1 column each: Total Translated, Last Upload)"
+      ]
+    },
+    "history": {
+      "description": "A dense, data-heavy table view of past translations.",
+      "components": [
+        "Shadcn Table with columns: Date, Filename, Original Language, Status, Actions (View/Download PDF)"
+      ]
+    },
+    "viewer_modal": {
+      "description": "Split-screen dialog comparing original image and translated text side-by-side before PDF generation."
+    }
+  },
+  "accessibility_and_testing": {
+    "data_testid_rules": "All interactive elements must have a kebab-case, role-based data-testid attribute (e.g., 'upload-dropzone', 'translate-submit-btn', 'download-pdf-btn').",
+    "contrast": "Ensure all text, especially JetBrains Mono data points, meets a 4.5:1 ratio against the off-white background."
+  }
+}
