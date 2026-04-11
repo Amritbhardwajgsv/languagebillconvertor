@@ -19,10 +19,10 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="w-64 bg-card border-r border-border h-screen fixed left-0 top-0 flex flex-col" data-testid="sidebar">
-      <div className="p-6 border-b border-border">
-        <h1 className="text-2xl font-bold tracking-tighter">BillTranslate</h1>
-        <p className="text-xs text-muted-foreground mt-1 uppercase tracking-wider">OCR & Translation</p>
+    <div className="w-64 border-r h-screen fixed left-0 top-0 flex flex-col" style={{ backgroundColor: '#FFFFFF', borderColor: '#E5E5E5' }} data-testid="sidebar">
+      <div className="p-6 border-b" style={{ borderColor: '#E5E5E5' }}>
+        <h1 className="text-2xl font-bold tracking-tighter" style={{ color: '#0A0A0A' }}>BillTranslate</h1>
+        <p className="text-xs mt-1 uppercase tracking-wider" style={{ color: '#525252' }}>OCR & Translation</p>
       </div>
       
       <nav className="flex-1 p-4">
@@ -35,11 +35,14 @@ const Sidebar = () => {
               key={item.path}
               to={item.path}
               data-testid={`nav-${item.label.toLowerCase()}`}
-              className={`flex items-center gap-3 px-4 py-3 mb-1 transition-colors ${
+              className="flex items-center gap-3 px-4 py-3 mb-1 transition-colors"
+              style={
                 isActive
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-foreground hover:bg-secondary'
-              }`}
+                  ? { backgroundColor: '#002FA7', color: '#FFFFFF' }
+                  : { color: '#0A0A0A' }
+              }
+              onMouseEnter={(e) => !isActive && (e.currentTarget.style.backgroundColor = '#F5F5F5')}
+              onMouseLeave={(e) => !isActive && (e.currentTarget.style.backgroundColor = 'transparent')}
             >
               <Icon size={20} weight={isActive ? 'fill' : 'regular'} />
               <span className="text-sm font-medium">{item.label}</span>
@@ -48,8 +51,8 @@ const Sidebar = () => {
         })}
       </nav>
 
-      <div className="p-4 border-t border-border">
-        <div className="terminal-text text-xs text-muted-foreground space-y-1">
+      <div className="p-4 border-t" style={{ borderColor: '#E5E5E5' }}>
+        <div className="terminal-text text-xs space-y-1" style={{ color: '#525252' }}>
           <div>System: Online</div>
           <div>Engine: Gemini 3 Flash</div>
         </div>
@@ -127,19 +130,21 @@ const Dashboard = () => {
     <div className="space-y-6" data-testid="dashboard">
       {/* Welcome Banner */}
       <div
-        className="relative p-8 bg-card border border-border overflow-hidden"
+        className="relative p-8 border overflow-hidden"
         style={{
+          backgroundColor: '#FFFFFF',
+          borderColor: '#E5E5E5',
           backgroundImage: 'url(https://static.prod-images.emergentagent.com/jobs/7504f9e0-890e-457d-bcbf-ed056fcb5564/images/783f45b01ffcac3c64a8d85bcc33498fde7a1c4f2fc2d1c70813015aa2f56431.png)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
       >
-        <div className="relative z-10 bg-background/95 p-6 max-w-2xl">
-          <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Supply Chain Intelligence</span>
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tighter mt-2 mb-3">
+        <div className="relative z-10 p-6 max-w-2xl" style={{ backgroundColor: 'rgba(247, 247, 247, 0.95)' }}>
+          <span className="text-xs uppercase tracking-[0.2em]" style={{ color: '#525252' }}>Supply Chain Intelligence</span>
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tighter mt-2 mb-3" style={{ color: '#0A0A0A' }}>
             Convert Local Language Bills
           </h1>
-          <p className="text-base text-muted-foreground leading-relaxed">
+          <p className="text-base leading-relaxed" style={{ color: '#525252' }}>
             Upload Hindi or regional language invoices and receive accurate English translations in PDF format.
             Perfect for export documentation and supply chain management.
           </p>
@@ -159,22 +164,22 @@ const Dashboard = () => {
 
         {/* Quick Stats */}
         <div className="space-y-6">
-          <div className="grid-cell bg-card p-6" data-testid="stats-total">
-            <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Total Translated</div>
-            <div className="text-4xl font-bold tracking-tighter">{stats.total}</div>
+          <div className="grid-cell p-6" style={{ backgroundColor: '#FFFFFF' }} data-testid="stats-total">
+            <div className="text-xs uppercase tracking-[0.2em] mb-2" style={{ color: '#525252' }}>Total Translated</div>
+            <div className="text-4xl font-bold tracking-tighter" style={{ color: '#0A0A0A' }}>{stats.total}</div>
           </div>
 
-          <div className="grid-cell bg-card p-6" data-testid="stats-recent">
-            <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Last Upload</div>
+          <div className="grid-cell p-6" style={{ backgroundColor: '#FFFFFF' }} data-testid="stats-recent">
+            <div className="text-xs uppercase tracking-[0.2em] mb-2" style={{ color: '#525252' }}>Last Upload</div>
             {stats.recent ? (
               <>
-                <div className="text-sm font-medium mb-1 truncate">{stats.recent.filename}</div>
-                <div className="terminal-text text-xs text-muted-foreground">
+                <div className="text-sm font-medium mb-1 truncate" style={{ color: '#0A0A0A' }}>{stats.recent.filename}</div>
+                <div className="terminal-text text-xs" style={{ color: '#525252' }}>
                   {new Date(stats.recent.upload_date).toLocaleDateString()}
                 </div>
               </>
             ) : (
-              <div className="text-sm text-muted-foreground">No uploads yet</div>
+              <div className="text-sm" style={{ color: '#525252' }}>No uploads yet</div>
             )}
           </div>
         </div>
@@ -182,30 +187,31 @@ const Dashboard = () => {
 
       {/* How It Works */}
       <div
-        className="relative p-8 border border-border overflow-hidden"
+        className="relative p-8 border overflow-hidden"
         style={{
+          borderColor: '#E5E5E5',
           backgroundImage: 'url(https://images.unsplash.com/photo-1673874855449-e8620ddfa867?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwxfHxwYXBlciUyMHJlY2VpcHRzJTIwYmlsbHMlMjBhY2NvdW50aW5nfGVufDB8fHx8MTc3NTkxMjkyMHww&ixlib=rb-4.1.0&q=85)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
       >
-        <div className="relative z-10 bg-background/95 p-6">
-          <h2 className="text-2xl font-bold tracking-tight mb-6">How It Works</h2>
+        <div className="relative z-10 p-6" style={{ backgroundColor: 'rgba(247, 247, 247, 0.95)' }}>
+          <h2 className="text-2xl font-bold tracking-tight mb-6" style={{ color: '#0A0A0A' }}>How It Works</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <div className="terminal-text text-xs text-primary mb-2">STEP 01</div>
-              <h3 className="font-semibold mb-2">Upload Bills</h3>
-              <p className="text-sm text-muted-foreground">Drag and drop or select bill images in any format</p>
+              <div className="terminal-text text-xs mb-2" style={{ color: '#002FA7' }}>STEP 01</div>
+              <h3 className="font-semibold mb-2" style={{ color: '#0A0A0A' }}>Upload Bills</h3>
+              <p className="text-sm" style={{ color: '#525252' }}>Drag and drop or select bill images in any format</p>
             </div>
             <div>
-              <div className="terminal-text text-xs text-primary mb-2">STEP 02</div>
-              <h3 className="font-semibold mb-2">AI Translation</h3>
-              <p className="text-sm text-muted-foreground">OCR extracts text and translates to English</p>
+              <div className="terminal-text text-xs mb-2" style={{ color: '#002FA7' }}>STEP 02</div>
+              <h3 className="font-semibold mb-2" style={{ color: '#0A0A0A' }}>AI Translation</h3>
+              <p className="text-sm" style={{ color: '#525252' }}>OCR extracts text and translates to English</p>
             </div>
             <div>
-              <div className="terminal-text text-xs text-primary mb-2">STEP 03</div>
-              <h3 className="font-semibold mb-2">Download PDF</h3>
-              <p className="text-sm text-muted-foreground">Get formatted PDF with translated content</p>
+              <div className="terminal-text text-xs mb-2" style={{ color: '#002FA7' }}>STEP 03</div>
+              <h3 className="font-semibold mb-2" style={{ color: '#0A0A0A' }}>Download PDF</h3>
+              <p className="text-sm" style={{ color: '#525252' }}>Get formatted PDF with translated content</p>
             </div>
           </div>
         </div>

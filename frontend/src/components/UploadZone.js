@@ -32,7 +32,8 @@ const UploadZone = ({ onUpload, isUploading, uploadProgress }) => {
       data-testid="upload-dropzone"
       className={`tracing-beam-border ${
         isDragActive ? 'active' : ''
-      } relative min-h-[320px] flex flex-col items-center justify-center p-8 bg-card cursor-pointer hover:border-primary/70 transition-colors`}
+      } relative min-h-[320px] flex flex-col items-center justify-center p-8 cursor-pointer transition-colors`}
+      style={{ backgroundColor: '#FFFFFF' }}
     >
       <input {...getInputProps()} />
       
@@ -59,11 +60,11 @@ const UploadZone = ({ onUpload, isUploading, uploadProgress }) => {
           <UploadSimple size={64} weight="duotone" className="mx-auto mb-4 text-muted-foreground" />
         )}
 
-        <h3 className="text-xl font-semibold mb-2 tracking-tight">
+        <h3 className="text-xl font-semibold mb-2 tracking-tight" style={{ color: '#0A0A0A' }}>
           {isUploading ? 'Processing...' : 'Upload Bill Images'}
         </h3>
         
-        <p className="text-sm text-muted-foreground mb-6 max-w-md">
+        <p className="text-sm mb-6 max-w-md" style={{ color: '#525252' }}>
           {isUploading
             ? 'Analyzing your documents...'
             : 'Drag & drop bill images here, or click to select files. Supports JPEG, PNG, WEBP.'}
@@ -72,7 +73,7 @@ const UploadZone = ({ onUpload, isUploading, uploadProgress }) => {
         {isUploading ? (
           <div className="w-full max-w-md mx-auto space-y-2">
             <Progress value={uploadProgress} className="h-1" />
-            <p className="terminal-text text-xs text-muted-foreground">
+            <p className="terminal-text text-xs" style={{ color: '#525252' }}>
               {uploadProgress < 50 ? 'Uploading images...' : uploadProgress < 100 ? 'Processing files...' : 'Complete'}
             </p>
           </div>

@@ -103,20 +103,20 @@ const HistoryPage = () => {
           alt="No bills"
           className="w-64 h-64 object-contain mb-6 opacity-50"
         />
-        <h3 className="text-xl font-semibold mb-2 tracking-tight">No Translation History</h3>
-        <p className="text-sm text-muted-foreground">Upload your first bill to get started</p>
+        <h3 className="text-xl font-semibold mb-2 tracking-tight" style={{ color: '#0A0A0A' }}>No Translation History</h3>
+        <p className="text-sm" style={{ color: '#525252' }}>Upload your first bill to get started</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6" data-testid="history-page">
-      <div className="border-b border-border pb-4">
-        <h1 className="text-4xl font-bold tracking-tighter">Translation History</h1>
-        <p className="text-sm text-muted-foreground mt-2">View and download all your translated bills</p>
+      <div className="pb-4" style={{ borderBottom: '1px solid #E5E5E5' }}>
+        <h1 className="text-4xl font-bold tracking-tighter" style={{ color: '#0A0A0A' }}>Translation History</h1>
+        <p className="text-sm mt-2" style={{ color: '#525252' }}>View and download all your translated bills</p>
       </div>
 
-      <div className="border border-border bg-card">
+      <div className="border" style={{ backgroundColor: '#FFFFFF', borderColor: '#E5E5E5' }}>
         <Table>
           <TableHeader>
             <TableRow className="border-b border-border hover:bg-transparent">
