@@ -216,7 +216,7 @@ const Dashboard = () => {
 
 function App() {
   return (
-    <div className="App bg-background min-h-screen">
+    <div className="App min-h-screen" style={{ backgroundColor: 'rgb(247, 247, 247)', color: 'rgb(10, 10, 10)' }}>
       <BrowserRouter>
         <Sidebar />
         <main className="ml-64 p-8">
