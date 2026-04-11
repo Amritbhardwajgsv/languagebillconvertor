@@ -282,101 +282,46 @@ async def generate_pdf(bill_id: str):
         elements.append(meta_table)
         elements.append(Spacer(1, 0.3*inch))
         
-        # Parse the translated text to extract bill structure
+        # Get the full translated text
         text = bill["translated_text"]
         
-        # Try to extract table data if present
-        lines = text.split('\\n')
+        # Remove the "LANGUAGE:" and "TRANSLATED BILL:" headers if present
+        text = text.replace('LANGUAGE: Hindi', '').replace('LANGUAGE:', '').replace('TRANSLATED BILL:', '').strip()
         
-        # Look for table patterns
-        table_data = []
-        in_table = False
-        header_info = []
-        footer_info = []
+        # Split into lines
+        lines = [line.strip() for line in text.split('\n') if line.strip()]
         
-        for i, line in enumerate(lines):
-            line = line.strip()
-            if not line:
-                continue
-                
-            # Skip language identifier
-            if line.startswith('LANGUAGE:'):
-                continue
-            if line.startswith('TRANSLATED BILL:'):
-                continue
-                
-            # Detect table headers (S.No, KG, ITEM, TOTAL, etc.)
-            if 'S.No' in line or 'S NO' in line.upper() or ('ITEM' in line.upper() and 'TOTAL' in line.upper()):
-                in_table = True
-                # Clean up the header
-                headers = [h.strip() for h in line.split('|') if h.strip()]
-                if headers:
-                    table_data.append(headers)
-                continue
-            
-            # If we're in a table and line has pipe separators
-            if in_table and '|' in line:
-                # Check if it's a separator line (all dashes)
-                if all(c in '-|: ' for c in line):
-                    continue
-                    
-                row = [cell.strip() for cell in line.split('|') if cell.strip()]
-                if row and any(cell for cell in row):  # If row has content
-                    table_data.append(row)
-            elif in_table and not '|' in line:
-                # End of table
-                in_table = False
-                footer_info.append(line)
-            elif not in_table and i < 10:  # Header info (first few lines)
-                header_info.append(line)
-            elif not in_table:
-                footer_info.append(line)
-        
-        # Add header information
-        if header_info:
-            for info in header_info:
-                if info and not info.startswith('*'):
-                    elements.append(Paragraph(info, normal_style))
-            elements.append(Spacer(1, 0.2*inch))
-        
-        # Add table if found
-        if table_data and len(table_data) > 1:
-            # Create the table
-            bill_table = Table(table_data, repeatRows=1)
-            bill_table.setStyle(TableStyle([
-                # Header styling
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#002FA7')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                
-                # Body styling
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#0A0A0A')),
-                ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('TOPPADDING', (0, 1), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
-                
-                # Grid
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E5E5')),
-                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#002FA7')),
-                
-                # Alternate row colors
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F7F7F7')]),
-            ]))
-            
-            elements.append(bill_table)
-            elements.append(Spacer(1, 0.2*inch))
-        
-        # Add footer information
-        if footer_info:
-            for info in footer_info:
-                if info:
-                    elements.append(Paragraph(info, normal_style))
+        # Process all content
+        for line in lines:
+            # Check if this line contains table data (has pipe separators)
+            if '|' in line and not all(c in '-|: ' for c in line):
+                # It's a table row - create a simple table
+                cells = [cell.strip() for cell in line.split('|') if cell.strip()]
+                if cells:
+                    # Create a single-row table for this line
+                    row_table = Table([cells])
+                    row_table.setStyle(TableStyle([
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E5E5')),
+                        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F7F7F7')),
+                        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#0A0A0A')),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 9),
+                        ('TOPPADDING', (0, 0), (-1, -1), 4),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                    ]))
+                    elements.append(row_table)
+                    elements.append(Spacer(1, 0.05*inch))
+            else:
+                # Regular text line
+                # Check if it's a header/important line (has asterisks or all caps)
+                if line.startswith('**') or line.isupper() and len(line) > 3:
+                    elements.append(Paragraph(f"<b>{line.replace('**', '')}</b>", heading_style))
+                else:
+                    elements.append(Paragraph(line, normal_style))
+                elements.append(Spacer(1, 0.05*inch))
         
         # Build PDF
         doc.build(elements)
