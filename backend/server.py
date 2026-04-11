@@ -130,7 +130,7 @@ async def translate_bill(bill_id: str):
         chat = LlmChat(
             api_key=API_KEY,
             session_id=f"bill-{bill_id}",
-            system_message="You are an expert OCR and translation assistant. Extract text from bill images and translate them accurately to English while preserving the structure and formatting."
+            system_message="You are an expert at reading invoices and bills. Extract all information and structure it properly."
         ).with_model("gemini", "gemini-3-flash-preview")
         
         # Create image content from base64
@@ -138,46 +138,72 @@ async def translate_bill(bill_id: str):
             image_base64=bill["original_image_base64"]
         )
         
-        # Create message with image
+        # Create message with image - ask for structured JSON
         user_message = UserMessage(
-            text="""Please analyze this bill/invoice image and:
-1. Identify the language used in the document
-2. Extract ALL text from the image
-3. Translate the entire content to English
-4. Preserve the structure and formatting (headers, line items, totals, etc.)
-5. Return the output in this exact format:
+            text="""Analyze this bill/invoice image and extract ALL information in the following JSON format:
 
-LANGUAGE: [detected language]
+{
+  "language": "detected language (e.g., Hindi, Tamil, etc.)",
+  "business_name": "store/business name",
+  "business_address": "full address",
+  "business_phone": "phone numbers",
+  "bill_number": "invoice/bill number",
+  "bill_date": "date on the bill",
+  "customer_name": "customer name if present",
+  "items": [
+    {
+      "sno": "serial number",
+      "item_name": "item description in English",
+      "quantity": "quantity with unit",
+      "rate": "rate/price per unit",
+      "amount": "total amount"
+    }
+  ],
+  "subtotal": "subtotal if present",
+  "tax": "tax amount if present",
+  "total": "grand total",
+  "notes": "any additional notes or terms"
+}
 
-TRANSLATED BILL:
-[translated content with preserved structure]
-""",
+IMPORTANT: 
+- Translate ALL text to English
+- If a field is not present in the bill, use empty string ""
+- For items, extract as many rows as visible
+- Preserve all numbers exactly as shown
+- Return ONLY the JSON, no other text""",
             file_contents=[image_content]
         )
         
         # Get response from Gemini
         response = await chat.send_message(user_message)
         
-        # Extract language from response
-        language = "Unknown"
-        if "LANGUAGE:" in response:
-            language_line = response.split("\n")[0]
-            language = language_line.replace("LANGUAGE:", "").strip()
+        # Try to parse JSON from response
+        import json
+        import re
         
-        # Update bill in database
+        # Extract JSON from response (handle cases where LLM adds extra text)
+        json_match = re.search(r'\{.*\}', response, re.DOTALL)
+        if json_match:
+            bill_data = json.loads(json_match.group())
+        else:
+            # Fallback: store raw response
+            bill_data = {"raw_translation": response}
+        
+        # Update bill in database with structured data
         await db.bills.update_one(
             {"id": bill_id},
             {
                 "$set": {
                     "status": "translated",
-                    "original_language": language,
-                    "translated_text": response
+                    "original_language": bill_data.get("language", "Unknown"),
+                    "translated_text": response,
+                    "structured_data": bill_data
                 }
             }
         )
         
         # Get updated bill
-        updated_bill = await db.bills.find_one({"id": bill_id}, {"_id": 0})
+        updated_bill = await db.bills.find_one({{"id": bill_id}}, {"_id": 0})
         
         return BillResponse(
             id=updated_bill["id"],
@@ -208,9 +234,10 @@ async def generate_pdf(bill_id: str):
     try:
         from reportlab.lib import colors
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.units import inch
         from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+        import json
         
         # Get bill from database
         bill = await db.bills.find_one({"id": bill_id}, {"_id": 0})
@@ -220,108 +247,143 @@ async def generate_pdf(bill_id: str):
         if bill["status"] != "translated":
             raise HTTPException(status_code=400, detail="Bill not yet translated")
         
-        # Create PDF in memory
+        # Get structured data
+        structured_data = bill.get("structured_data", {})
+        
+        # Create PDF
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter, 
+        doc = SimpleDocTemplate(buffer, pagesize=letter,
                               rightMargin=50, leftMargin=50,
                               topMargin=50, bottomMargin=50)
         
-        # Container for the 'flowable' objects
         elements = []
-        
-        # Define styles
         styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=20,
-            textColor=colors.HexColor('#0A0A0A'),
-            spaceAfter=30,
-            alignment=TA_CENTER,
-            fontName='Helvetica-Bold'
-        )
         
-        heading_style = ParagraphStyle(
-            'CustomHeading',
-            parent=styles['Heading2'],
-            fontSize=14,
-            textColor=colors.HexColor('#002FA7'),
-            spaceAfter=12,
-            fontName='Helvetica-Bold'
-        )
+        # Styles
+        title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=24,
+                                     textColor=colors.HexColor('#002FA7'), alignment=TA_CENTER,
+                                     spaceAfter=20, fontName='Helvetica-Bold')
         
-        normal_style = ParagraphStyle(
-            'CustomNormal',
-            parent=styles['Normal'],
-            fontSize=10,
-            textColor=colors.HexColor('#0A0A0A'),
-            spaceAfter=6
-        )
+        heading_style = ParagraphStyle('Heading', parent=styles['Heading2'], fontSize=12,
+                                      textColor=colors.HexColor('#0A0A0A'), spaceAfter=8,
+                                      fontName='Helvetica-Bold')
         
-        # Add title
-        elements.append(Paragraph("TRANSLATED INVOICE", title_style))
+        normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=10,
+                                     textColor=colors.HexColor('#0A0A0A'), spaceAfter=4)
+        
+        # Title
+        elements.append(Paragraph("INVOICE / BILL", title_style))
         elements.append(Spacer(1, 0.2*inch))
         
-        # Add metadata table
-        metadata = [
-            ['Original File:', bill['filename']],
-            ['Original Language:', bill['original_language']],
-            ['Translation Date:', bill['upload_date'][:10]],
-        ]
+        # Business Info Section
+        if structured_data.get("business_name"):
+            elements.append(Paragraph(f"<b>{structured_data['business_name']}</b>", heading_style))
+        if structured_data.get("business_address"):
+            elements.append(Paragraph(structured_data["business_address"], normal_style))
+        if structured_data.get("business_phone"):
+            elements.append(Paragraph(f"Phone: {structured_data['business_phone']}", normal_style))
         
-        meta_table = Table(metadata, colWidths=[2*inch, 4*inch])
-        meta_table.setStyle(TableStyle([
-            ('FONT', (0, 0), (0, -1), 'Helvetica-Bold', 9),
-            ('FONT', (1, 0), (1, -1), 'Helvetica', 9),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#0A0A0A')),
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ]))
+        elements.append(Spacer(1, 0.2*inch))
         
-        elements.append(meta_table)
-        elements.append(Spacer(1, 0.3*inch))
+        # Bill Details Table
+        details_data = []
+        if structured_data.get("bill_number"):
+            details_data.append(["Bill No:", structured_data["bill_number"]])
+        if structured_data.get("bill_date"):
+            details_data.append(["Date:", structured_data["bill_date"]])
+        if structured_data.get("customer_name"):
+            details_data.append(["Customer:", structured_data["customer_name"]])
         
-        # Get the full translated text
-        text = bill["translated_text"]
+        details_data.append(["Original Language:", bill.get("original_language", "Unknown")])
+        details_data.append(["Translation Date:", bill["upload_date"][:10]])
         
-        # Remove the "LANGUAGE:" and "TRANSLATED BILL:" headers if present
-        text = text.replace('LANGUAGE: Hindi', '').replace('LANGUAGE:', '').replace('TRANSLATED BILL:', '').strip()
+        if details_data:
+            details_table = Table(details_data, colWidths=[1.5*inch, 4*inch])
+            details_table.setStyle(TableStyle([
+                ('FONT', (0, 0), (0, -1), 'Helvetica-Bold', 9),
+                ('FONT', (1, 0), (1, -1), 'Helvetica', 9),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#0A0A0A')),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ]))
+            elements.append(details_table)
+            elements.append(Spacer(1, 0.3*inch))
         
-        # Split into lines
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        # Items Table
+        items = structured_data.get("items", [])
+        if items:
+            elements.append(Paragraph("ITEMS", heading_style))
+            elements.append(Spacer(1, 0.1*inch))
+            
+            # Create table headers
+            table_data = [["S.No", "Item Description", "Quantity", "Rate", "Amount"]]
+            
+            # Add item rows
+            for item in items:
+                row = [
+                    item.get("sno", ""),
+                    item.get("item_name", ""),
+                    item.get("quantity", ""),
+                    item.get("rate", ""),
+                    item.get("amount", "")
+                ]
+                table_data.append(row)
+            
+            items_table = Table(table_data, colWidths=[0.6*inch, 2.5*inch, 1*inch, 1*inch, 1*inch])
+            items_table.setStyle(TableStyle([
+                # Header
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#002FA7')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                
+                # Body
+                ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#0A0A0A')),
+                ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # S.No center
+                ('ALIGN', (1, 1), (1, -1), 'LEFT'),    # Item left
+                ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),  # Numbers right
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('TOPPADDING', (0, 1), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                
+                # Grid and colors
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E5E5')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F7F7F7')]),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#002FA7')),
+            ]))
+            
+            elements.append(items_table)
+            elements.append(Spacer(1, 0.2*inch))
         
-        # Process all content
-        for line in lines:
-            # Check if this line contains table data (has pipe separators)
-            if '|' in line and not all(c in '-|: ' for c in line):
-                # It's a table row - create a simple table
-                cells = [cell.strip() for cell in line.split('|') if cell.strip()]
-                if cells:
-                    # Create a single-row table for this line
-                    row_table = Table([cells])
-                    row_table.setStyle(TableStyle([
-                        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E5E5')),
-                        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F7F7F7')),
-                        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#0A0A0A')),
-                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-                        ('FONTSIZE', (0, 0), (-1, -1), 9),
-                        ('TOPPADDING', (0, 0), (-1, -1), 4),
-                        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-                        ('LEFTPADDING', (0, 0), (-1, -1), 6),
-                        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-                    ]))
-                    elements.append(row_table)
-                    elements.append(Spacer(1, 0.05*inch))
-            else:
-                # Regular text line
-                # Check if it's a header/important line (has asterisks or all caps)
-                if line.startswith('**') or line.isupper() and len(line) > 3:
-                    elements.append(Paragraph(f"<b>{line.replace('**', '')}</b>", heading_style))
-                else:
-                    elements.append(Paragraph(line, normal_style))
-                elements.append(Spacer(1, 0.05*inch))
+        # Totals Section
+        totals_data = []
+        if structured_data.get("subtotal"):
+            totals_data.append(["Subtotal:", structured_data["subtotal"]])
+        if structured_data.get("tax"):
+            totals_data.append(["Tax:", structured_data["tax"]])
+        if structured_data.get("total"):
+            totals_data.append(["<b>Grand Total:</b>", f"<b>{structured_data['total']}</b>"])
+        
+        if totals_data:
+            totals_table = Table(totals_data, colWidths=[4.5*inch, 1.5*inch])
+            totals_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, -2), 'Helvetica', 10),
+                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold', 11),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#0A0A0A')),
+                ('LINEABOVE', (0, -1), (-1, -1), 1, colors.HexColor('#002FA7')),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ]))
+            elements.append(totals_table)
+            elements.append(Spacer(1, 0.2*inch))
+        
+        # Notes
+        if structured_data.get("notes"):
+            elements.append(Paragraph("<b>Notes:</b>", normal_style))
+            elements.append(Paragraph(structured_data["notes"], normal_style))
         
         # Build PDF
         doc.build(elements)
@@ -332,11 +394,10 @@ async def generate_pdf(bill_id: str):
         temp_file.write(buffer.read())
         temp_file.close()
         
-        # Return file
         return FileResponse(
             temp_file.name,
             media_type="application/pdf",
-            filename=f"translated_{bill['filename'].rsplit('.', 1)[0]}.pdf"
+            filename=f"invoice_{bill['filename'].rsplit('.', 1)[0]}.pdf"
         )
         
     except HTTPException:
