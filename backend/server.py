@@ -203,7 +203,7 @@ IMPORTANT:
         )
         
         # Get updated bill
-        updated_bill = await db.bills.find_one({{"id": bill_id}}, {"_id": 0})
+        updated_bill = await db.bills.find_one({"id": bill_id}, {"_id": 0})
         
         return BillResponse(
             id=updated_bill["id"],
