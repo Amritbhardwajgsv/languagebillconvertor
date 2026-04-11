@@ -206,6 +206,12 @@ TRANSLATED BILL:
 async def generate_pdf(bill_id: str):
     """Generate and download PDF of translated bill"""
     try:
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+        from reportlab.lib.units import inch
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+        
         # Get bill from database
         bill = await db.bills.find_one({"id": bill_id}, {"_id": 0})
         if not bill:
@@ -216,56 +222,164 @@ async def generate_pdf(bill_id: str):
         
         # Create PDF in memory
         buffer = io.BytesIO()
-        pdf = canvas.Canvas(buffer, pagesize=letter)
-        width, height = letter
+        doc = SimpleDocTemplate(buffer, pagesize=letter, 
+                              rightMargin=50, leftMargin=50,
+                              topMargin=50, bottomMargin=50)
         
-        # Set up fonts and styling
-        pdf.setFont("Helvetica-Bold", 16)
-        y_position = height - 50
+        # Container for the 'flowable' objects
+        elements = []
         
-        # Title
-        pdf.drawString(50, y_position, "Translated Bill")
-        y_position -= 30
+        # Define styles
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=20,
+            textColor=colors.HexColor('#0A0A0A'),
+            spaceAfter=30,
+            alignment=TA_CENTER,
+            fontName='Helvetica-Bold'
+        )
         
-        # Metadata
-        pdf.setFont("Helvetica", 10)
-        pdf.drawString(50, y_position, f"Original File: {bill['filename']}")
-        y_position -= 15
-        pdf.drawString(50, y_position, f"Language: {bill['original_language']}")
-        y_position -= 15
-        pdf.drawString(50, y_position, f"Date: {bill['upload_date'][:10]}")
-        y_position -= 30
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.HexColor('#002FA7'),
+            spaceAfter=12,
+            fontName='Helvetica-Bold'
+        )
         
-        # Draw separator line
-        pdf.line(50, y_position, width - 50, y_position)
-        y_position -= 20
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#0A0A0A'),
+            spaceAfter=6
+        )
         
-        # Translated text
-        pdf.setFont("Helvetica", 11)
+        # Add title
+        elements.append(Paragraph("TRANSLATED INVOICE", title_style))
+        elements.append(Spacer(1, 0.2*inch))
+        
+        # Add metadata table
+        metadata = [
+            ['Original File:', bill['filename']],
+            ['Original Language:', bill['original_language']],
+            ['Translation Date:', bill['upload_date'][:10]],
+        ]
+        
+        meta_table = Table(metadata, colWidths=[2*inch, 4*inch])
+        meta_table.setStyle(TableStyle([
+            ('FONT', (0, 0), (0, -1), 'Helvetica-Bold', 9),
+            ('FONT', (1, 0), (1, -1), 'Helvetica', 9),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#0A0A0A')),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        
+        elements.append(meta_table)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Parse the translated text to extract bill structure
         text = bill["translated_text"]
         
-        # Split text into lines that fit within page width
-        max_width = width - 100
-        lines = []
-        for paragraph in text.split('\n'):
-            if paragraph.strip():
-                wrapped_lines = simpleSplit(paragraph, "Helvetica", 11, max_width)
-                lines.extend(wrapped_lines)
-            else:
-                lines.append('')
+        # Try to extract table data if present
+        lines = text.split('\\n')
         
-        # Draw text lines
-        for line in lines:
-            if y_position < 50:  # Start new page if needed
-                pdf.showPage()
-                pdf.setFont("Helvetica", 11)
-                y_position = height - 50
+        # Look for table patterns
+        table_data = []
+        in_table = False
+        header_info = []
+        footer_info = []
+        
+        for i, line in enumerate(lines):
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Skip language identifier
+            if line.startswith('LANGUAGE:'):
+                continue
+            if line.startswith('TRANSLATED BILL:'):
+                continue
+                
+            # Detect table headers (S.No, KG, ITEM, TOTAL, etc.)
+            if 'S.No' in line or 'S NO' in line.upper() or ('ITEM' in line.upper() and 'TOTAL' in line.upper()):
+                in_table = True
+                # Clean up the header
+                headers = [h.strip() for h in line.split('|') if h.strip()]
+                if headers:
+                    table_data.append(headers)
+                continue
             
-            pdf.drawString(50, y_position, line)
-            y_position -= 15
+            # If we're in a table and line has pipe separators
+            if in_table and '|' in line:
+                # Check if it's a separator line (all dashes)
+                if all(c in '-|: ' for c in line):
+                    continue
+                    
+                row = [cell.strip() for cell in line.split('|') if cell.strip()]
+                if row and any(cell for cell in row):  # If row has content
+                    table_data.append(row)
+            elif in_table and not '|' in line:
+                # End of table
+                in_table = False
+                footer_info.append(line)
+            elif not in_table and i < 10:  # Header info (first few lines)
+                header_info.append(line)
+            elif not in_table:
+                footer_info.append(line)
         
-        # Finalize PDF
-        pdf.save()
+        # Add header information
+        if header_info:
+            for info in header_info:
+                if info and not info.startswith('*'):
+                    elements.append(Paragraph(info, normal_style))
+            elements.append(Spacer(1, 0.2*inch))
+        
+        # Add table if found
+        if table_data and len(table_data) > 1:
+            # Create the table
+            bill_table = Table(table_data, repeatRows=1)
+            bill_table.setStyle(TableStyle([
+                # Header styling
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#002FA7')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                
+                # Body styling
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#0A0A0A')),
+                ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('TOPPADDING', (0, 1), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                
+                # Grid
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E5E5')),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#002FA7')),
+                
+                # Alternate row colors
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F7F7F7')]),
+            ]))
+            
+            elements.append(bill_table)
+            elements.append(Spacer(1, 0.2*inch))
+        
+        # Add footer information
+        if footer_info:
+            for info in footer_info:
+                if info:
+                    elements.append(Paragraph(info, normal_style))
+        
+        # Build PDF
+        doc.build(elements)
         buffer.seek(0)
         
         # Save to temp file
