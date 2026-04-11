@@ -1,34 +1,54 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+.tracing-beam-border {
+  position: relative;
+  border: 2px dashed hsl(var(--border));
+  transition: border-color 0.3s ease;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+.tracing-beam-border.active {
+  border-color: hsl(var(--primary));
+  animation: pulse-border 2s ease-in-out infinite;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+@keyframes pulse-border {
+  0%, 100% {
+    border-color: hsl(var(--primary));
+  }
+  50% {
+    border-color: hsl(var(--primary) / 0.5);
+  }
 }
 
-.App-link {
-    color: #61dafb;
+.scanning-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, hsl(var(--primary)), transparent);
+  animation: scan 2s linear infinite;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+@keyframes scan {
+  0% {
+    top: 0;
+  }
+  100% {
+    top: 100%;
+  }
+}
+
+.grid-cell {
+  border-right: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.status-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.terminal-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.875rem;
 }
