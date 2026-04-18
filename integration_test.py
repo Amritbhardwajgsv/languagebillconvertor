@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 
 class BillTranslationAPITesterWithRealImage:
-    def __init__(self, base_url="https://multilang-invoice-1.preview.emergentagent.com"):
+    def __init__(self, base_url="https://hindi-to-english-25.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.tests_run = 0
