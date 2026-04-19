@@ -11,7 +11,8 @@ from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
 import base64
-from emergentintegrations.llm.chat import LlmChat, UserMessage, FileContentWithMimeType, ImageContent
+from google import genai
+from google.genai import types
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import simpleSplit
@@ -24,10 +25,17 @@ import tempfile
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+mongo_client = AsyncIOMotorClient(mongo_url)
+db = mongo_client[os.environ['DB_NAME']]
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -35,8 +43,11 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# Get API key
-API_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+# Get Gemini API key
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+
+# Initialize Gemini client
+gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 # Define Models
 class Bill(BaseModel):
@@ -126,21 +137,11 @@ async def translate_bill(bill_id: str):
             {"$set": {"status": "processing"}}
         )
         
-        # Initialize Gemini chat
-        chat = LlmChat(
-            api_key=API_KEY,
-            session_id=f"bill-{bill_id}",
-            system_message="You are an expert at reading invoices and bills. Extract all information and structure it properly."
-        ).with_model("gemini", "gemini-3-flash-preview")
+        # Decode base64 image
+        image_bytes = base64.b64decode(bill["original_image_base64"])
+        mime_type = bill.get("mime_type", "image/jpeg")
         
-        # Create image content from base64
-        image_content = ImageContent(
-            image_base64=bill["original_image_base64"]
-        )
-        
-        # Create message with image - ask for structured JSON
-        user_message = UserMessage(
-            text="""Analyze this bill/invoice image and extract ALL information in the following JSON format:
+        prompt = """Analyze this bill/invoice image and extract ALL information in the following JSON format:
 
 {
   "language": "detected language (e.g., Hindi, Tamil, etc.)",
@@ -170,24 +171,33 @@ IMPORTANT:
 - If a field is not present in the bill, use empty string ""
 - For items, extract as many rows as visible
 - Preserve all numbers exactly as shown
-- Return ONLY the JSON, no other text""",
-            file_contents=[image_content]
+- Return ONLY the JSON, no other text"""
+
+        # Call Gemini API with image
+        response = gemini_client.models.generate_content(
+            model="gemini-3-flash-preview",
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                types.Part.from_text(text=prompt)
+            ],
+            config=types.GenerateContentConfig(
+                system_instruction="You are an expert at reading invoices and bills. Extract all information and structure it properly."
+            )
         )
         
-        # Get response from Gemini
-        response = await chat.send_message(user_message)
+        response_text = response.text
         
         # Try to parse JSON from response
         import json
         import re
         
         # Extract JSON from response (handle cases where LLM adds extra text)
-        json_match = re.search(r'\{.*\}', response, re.DOTALL)
+        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
         if json_match:
             bill_data = json.loads(json_match.group())
         else:
             # Fallback: store raw response
-            bill_data = {"raw_translation": response}
+            bill_data = {"raw_translation": response_text}
         
         # Update bill in database with structured data
         await db.bills.update_one(
@@ -196,7 +206,7 @@ IMPORTANT:
                 "$set": {
                     "status": "translated",
                     "original_language": bill_data.get("language", "Unknown"),
-                    "translated_text": response,
+                    "translated_text": response_text,
                     "structured_data": bill_data
                 }
             }
@@ -314,10 +324,8 @@ async def generate_pdf(bill_id: str):
             elements.append(Paragraph("ITEMS", heading_style))
             elements.append(Spacer(1, 0.1*inch))
             
-            # Create table headers
             table_data = [["S.No", "Item Description", "Quantity", "Rate", "Amount"]]
             
-            # Add item rows
             for item in items:
                 row = [
                     item.get("sno", ""),
@@ -330,25 +338,20 @@ async def generate_pdf(bill_id: str):
             
             items_table = Table(table_data, colWidths=[0.6*inch, 2.5*inch, 1*inch, 1*inch, 1*inch])
             items_table.setStyle(TableStyle([
-                # Header
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#002FA7')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, 0), 10),
                 ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
-                
-                # Body
                 ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#0A0A0A')),
-                ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # S.No center
-                ('ALIGN', (1, 1), (1, -1), 'LEFT'),    # Item left
-                ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),  # Numbers right
+                ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+                ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+                ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
                 ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 1), (-1, -1), 9),
                 ('TOPPADDING', (0, 1), (-1, -1), 6),
                 ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
-                
-                # Grid and colors
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E5E5')),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F7F7F7')]),
                 ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#002FA7')),
@@ -461,13 +464,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    mongo_client.close()
